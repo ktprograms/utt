@@ -5,3 +5,5 @@ Dockerfile.generated
 dist
 test/integration/utt-*.whl
 utt/version.txt
+.envrc
+.direnv/
