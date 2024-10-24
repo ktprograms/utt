@@ -2,8 +2,9 @@ import datetime
 import itertools
 from typing import List, Optional
 
-from ..constants import HELLO_ENTRY_NAME
+from ..constants import END_ENTRY_NAME
 from ..data_structures.activity import Activity
+from ..data_structures.entry import Entry
 from .entries import Entries
 from .local_timezone import LocalTimezone
 from .now import Now
@@ -34,26 +35,26 @@ def filter_activities_by_range(activities: Activities, date_range: DateRange, lo
 
 def get_current_activity(
     current_activity_name: Optional[str],
-    last_activity: Optional[Activity],
+    last_entry: Optional[Entry],
     now: Now,
     start_datetime: datetime,
     end_datetime: datetime,
 ) -> Optional[Activity]:
-    if current_activity_name is None or last_activity is None:
+    if current_activity_name is None or last_entry is None or last_entry.name == "end":
         return
 
-    last_activity_end = max(last_activity.end, start_datetime)
+    last_entry_time = max(last_entry.datetime, start_datetime)
 
-    now_is_between_last_activity_and_end_report_range = last_activity_end < now <= end_datetime
-    if not now_is_between_last_activity_and_end_report_range:
+    now_is_between_last_entry_and_end_report_range = last_entry_time < now <= end_datetime
+    if not now_is_between_last_entry_and_end_report_range:
         return
 
-    return Activity(current_activity_name, last_activity_end, now, True)
+    return Activity(f"{current_activity_name} {last_entry.name}", last_entry_time, now, True)
 
 
-def remove_hello_activities(activities):
+def remove_end_activities(activities):
     for activity in activities:
-        if activity.name.name != HELLO_ENTRY_NAME:
+        if activity.name.name != END_ENTRY_NAME:
             yield activity
 
 
@@ -74,14 +75,14 @@ def activities(report_args: ReportArgs, now: Now, local_timezone: LocalTimezone,
         + datetime.timedelta(days=1)
     )
 
-    last_activity = activities[-1] if activities else None
+    last_entry = entries[-1] if entries else None
     current_activity = get_current_activity(
-        report_args.current_activity_name, last_activity, now, start_datetime, end_datetime
+        report_args.current_activity_name, last_entry, now, start_datetime, end_datetime
     )
     if current_activity is not None:
         _filtered_activities.append(current_activity)
 
-    _filtered_activities = list(remove_hello_activities(_filtered_activities))
+    _filtered_activities = list(remove_end_activities(_filtered_activities))
     _filtered_activities = list(filter_activities_by_project(_filtered_activities, report_args.project_name_filter))
 
     return _filtered_activities
@@ -90,7 +91,7 @@ def activities(report_args: ReportArgs, now: Now, local_timezone: LocalTimezone,
 def _activities(entries: Entries):
     for prev_entry, next_entry in _pairwise(entries):
         activity = Activity(
-            next_entry.name,
+            prev_entry.name,
             prev_entry.datetime,
             next_entry.datetime,
             False,
